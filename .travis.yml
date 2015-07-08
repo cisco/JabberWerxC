@@ -6,7 +6,7 @@ env:
   PKG_CONFIG_PATH: $TRAVIS_BUILD_DIR/build-tools/pkgconfig
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -y pkg-config libexpat-dev libc-ares-dev libevent-dev libcurl4-openssl-dev libidn11-dev openssl
+  - sudo apt-get install -y pkg-config lcov libexpat-dev libc-ares-dev libevent-dev libcurl4-openssl-dev libidn11-dev openssl
   - wget http://www.cmake.org/files/v3.2/cmake-3.2.3-Linux-x86_64.tar.gz  -O /tmp/cmake.tar.gz
   - tar xzf /tmp/cmake.tar.gz
   - export PATH=$PWD/cmake-3.2.3-Linux-x86_64/bin/:$PATH
