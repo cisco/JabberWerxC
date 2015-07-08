@@ -124,3 +124,6 @@ Windows example:
 Portions created or assigned to Cisco Systems, Inc. are Copyright (c) 2010 Cisco Systems, Inc.  All Rights Reserved.
 
 See LICENSE for details.
+
+[![Build Status](https://travis-ci.org/cisco/JabberWerxC.svg?branch=master)](https://travis-ci.org/cisco/JabberWerxC)
+[![Coverage Status](https://coveralls.io/repos/cisco/JabberWerxC/badge.svg?branch=master&service=github)](https://coveralls.io/github/cisco/JabberWerxC?branch=master)
