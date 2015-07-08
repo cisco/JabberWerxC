@@ -2,7 +2,6 @@ language: c
 cache: ccache
 compiler:
   - clang
-  - gcc
 env:
   PKG_CONFIG_PATH: $TRAVIS_BUILD_DIR/build-tools/pkgconfig
 before_install:
