@@ -48,8 +48,8 @@ http://forums.gentoo.org/viewtopic-p-6169375.html?sid=1dec34d64643af26295011dd33
 ### Generating the Build Environment ###
 
 CMake will generate a build system appropriate for your platform.  First, install CMake for your platform.  Then, (*nix) in the `build` sub directory of the workspace root, execute:
- 
- * (*nix) `cmake ..`
+
+ * (*nix) `./build.sh`
  * (Windows) run the cmake-gui tool and select the workspace root as the
     source directory and the `build` sub directory as the binary output directory
 
@@ -88,11 +88,8 @@ There are also a number of options that can be set via ccmake or cmake-gui that 
 ('$' indicates the console prompt):
 
 ```
-  $ cd path/to/jwc/build
-  $ cmake ..
-  $ make
-  $ ccmake ..  # to change options, if desired
-  $ make
+  $ cd path/to/jwc
+  $ ./build.sh
 ```
 
 ### Build Example (Windows) ###
