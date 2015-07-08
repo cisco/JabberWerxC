@@ -4,7 +4,7 @@ An API for XMPP connectivity.
 
 ## Documentation ##
 
-Documentation for the API is available at http://cisco.github.io/JabberWerxC/
+Documentation for the API is available at https://cisco.github.io/JabberWerxC/
 
 ## Dependencies ##
 
