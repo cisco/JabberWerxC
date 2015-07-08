@@ -2,6 +2,10 @@
 
 An API for XMPP connectivity.
 
+## Documentation ##
+
+Documentation for the API is available at https://cisco.github.io/JabberWerxC/
+
 ## Dependencies ##
 
 JabberWerxC can be built under Unix, Linux, OS X, or Windows, and has the following dependencies (configured using pkg-config):
