@@ -1,0 +1,206 @@
+<!--
+/**
+ * filename:        developerGuide.html
+ *
+ * Portions created or assigned to Cisco Systems, Inc. are
+ * Copyright (c) 2011 Cisco Systems, Inc.  All Rights Reserved.
+ */
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>JabberWerxC Developer Guide</title>
+  <link rel="stylesheet" type="text/css" href="jabberwerx.css" />
+</head>
+<body class="border">
+
+<table width="90%">
+<tr>
+<td class="center"><h1 class="title">JabberWerxC Library Developer Guide</h1></td>
+</tr>
+</table>
+<div class="summary">
+<h2 align="center">
+
+C library for XMPP-based Presence and Instant Messaging
+
+</h2>
+</div>
+
+<h2>Introduction</h2>
+
+<p>The JabberWerxC library is a C XMPP library that allows you to integrate basic presence and messaging capailities into other C-based applications.</p>
+
+<p>JabberWerxC is comprised of the following modules:
+<ul>
+  <li><code>libevent2</code>: an open-source library that abstracts the various platform-specific I/O eventing mechanisms (select, epoll, kqueue, et al) with a common API for scheduling asynchronous callbacks for networking or timeout operations</li>
+  <li><code>libjabberwerx</code>: a low-level API for sending and receiving XMPP stanzas</li>
+</ul>
+</p>
+
+<hr/>
+
+<h2>Core Types</h2>
+
+<ul class="align1">
+  <li class="li-plain">
+    <h4 class="inner-headings"><code>jw_err</code></h4> A structure for reporting additional error information.  It is almost always the last argument to any JWC function, and its use is optional but highly recommended.
+    <h4 class="inner-headings"><code>jw_htable</code></h4> A hashtable representation, with integrated memory mangement. This type is used throughout JWC for configuration.
+    <h4 class="inner-headings"><code>jw_jid</code></h4> A JID (or Jabber ID) represents the form 'localpart@domain/resourcepart' (e.g. 'foo@bar.com/botclient').
+    <h4 class="inner-headings"><code>jw_dom_node</code></h4> A DOM (Document Object Model) represents the minimal XML required by XMPP, in a namespace-aware manner.
+    <h4 class="inner-headings"><code>jw_event</code></h4> The interface used to notify subscribers when various conditions or states are reached.
+    <h4 class="inner-headings"><code>jw_workq</code></h4> An asyncronous work queue built on top of libevent.
+    <h4 class="inner-headings"><code>jw_sasl_factory</code> and <code>jw_sasl_mech</code></h4> An XMPP-oriented SASL authentication framework
+    <h4 class="inner-headings"><code>jw_stream</code></h4> A low-level interface over the networking operations; the API takes and gives <code>jw_dom_node</code> instances and translates to (and from) the octet stream over the network (persistent TCP or BOSH connections).
+    <h4 class="inner-headings"><code>jw_client</code></h4> A higher-level interface for connecting to an XMPP server. It uses a <code>jw_stream</code> to manage the connection, handles authentication and identity, and allows the user to send and receive XMPP stanzas (&lt;iq/&gt;, &lt;message/&gt;, and &lt;presence/&gt; elements). This is the most common interface used to communicate with an XMPP server.
+  </li>
+</ul>
+
+<hr/>
+
+<h2>DOM</h2>
+
+<p>JWC has a simplified DOM that represents the minimum XML required by XMPP. It supports namespaces, attributes, elements, and character data; but does not provide for comments, processing instructions, or internal or external entity references.</p>
+
+<h3>Naming</h3>
+<p>Names in <code>jw_dom</code> use Clark notation in the form '{namespace-uri}local-name', with some convenience functions for getting just the namespace-URI and local-name.</p>
+
+<h3>Management and Creation</h3>
+<p>The starting point is <code>jw_dom_ctx</code>, which centralizes the memory management for DOM nodes. Multiple <code>jw_dom_ctx</code> instances can be in use; memory is not shared between <code>jw_dom_ctx</code>s. All nodes for a <code>jw_dom_ctx</code> are freed by calling <code>jw_dom_context_destroy()</code>. A node can be copied from one <code>jw_dom_ctx</code> to another. All nodes are represented by the <code>jw_dom</code> type.</p>
+
+<p>To create nodes:
+  <ul>
+    <li><code>jw_dom_context_create(ctx)</code>: Creates the DOM context, from which all other nodes are ultimately created</li>
+    <li><code>jw_dom_element_create(ctx, ename)</code>: Creates an element node with the given name</li>
+    <li><code>jw_dom_text_create(ctx, val)</code>: Creates a text node with the given character data value</li>
+  </ul>
+</p>
+
+<h3>Basic Operations</h3>
+<p>The API supports all of the basic operations for a node:
+  <ul>
+    <li><code>jw_dom_get_context()</code>: gets the owning <code>jw_dom_ctx</code> of a node</li>
+    <li><code>jw_dom_get_nodetype()</code>: gets the type of a node (attribute, namespace declaration, element, text)</li>
+    <li><code>jw_dom_get_ename()</code>: gets the name of a node (if any)</li>
+    <li><code>jw_dom_get_value()</code>: gets the value of a node (if any)</li>
+    <li><code>jw_dom_get_namespace_uri(e)</code>: gets the namespace-URI of the element or attribute</li>
+    <li><code>jw_dom_get_local_name(e)</code>: gets the local-part of the element or attribute</li>
+  </ul>
+</p>
+  
+<h3>Traversal and Manipulation</h3>
+<p>Node lists are done using an iterative process. From an element, a number of lists are obtained:
+  <ul>
+    <li><code>jw_dom_get_first_namespace(e)</code>: gets the first namespace declaration</li>
+    <li><code>jw_dom_get_first_attribute(e)</code>: gets the first attribute</li>
+    <li><code>jw_dom_get_first_child(e)</code>: gets the first child node (text or element)</li>
+    <li><code>jw_dom_get_first_element(e, ename)</code>: gets the first element (optionally matching a name)</li>
+  </ul>
+</p>
+
+<p>The next node in the list is retrieved using <code>jw_dom_get_sibling(n)</code>. The parent is retrieved using <code>jw_dom_get_parent(n)</code>. A node can be removed from its parent using <code>jw_dom_detach(n)</code>.</p>
+
+<p>As a convenience, the following are available:
+  <ul>
+    <li><code>jw_dom_get_attribute(e, ename)</code>: retrieves the value of the named attribute (or NULL if not present)</li>
+    <li><code>jw_dom_find_namespace_uri(e, prefix)</code>: retrieves the namespace-URI for the given prefix, searching ancestors if necessary</li>
+    <li><code>jw_dom_find_namespace_prefix(e, uri)</code>: retrieves the prefix for the given namespace-URI, searching ancestors if necessary</li>
+   </ul>
+  </p>
+
+<p>To modify an element:
+  <ul>
+    <li><code>jw_dom_set_attribute(e, ename, val)</code>: sets the value of the attribute with the given name, or removes the attribute if the value is NULL</code>
+    <li><code>jw_dom_put_namespace(e, prefix, uri)</code>: set the namespace declaration for the given prefix to have the given URI; or removes the namespace declaration if the URI is NULL</li>
+    <li><code>jw_dom_add_child(e, child)</code>: adds a child (element or text) to the given parent element, after all other children</li>
+    <li><code>jw_dom_remove_child(e, child)</code>: removes a child (element or text) from the given parent element</li>
+  </ul>
+</p>
+
+<h3>More Information</h3>
+
+<p>Detailed API documentation can be found <a href="api/html/dom_8h.html">here</a>.</p>
+
+<hr/>
+
+<h2>Eventing</h2>
+
+<h3>Basics</h3>
+<p>The event loop is managed using libevent's <code>event_base</code>. Every asynchronous function in JWC (e.g. <code>jw_client_connect()</code>) does not actually perform its operation; instead it validates inputs and prepares for the next stage, but the operations are not performed until <code>event_base_dispatch()</code> or one of its alternatives is called.</p>
+
+<p>JWC supports eventing using the <code>jw_event</code> type. It allows the user to bind a function to a particular event with user-specific data, and will be called when the condition is triggered.</p>
+
+<h3>Event Information</h3>
+<p>Each time a <code>jw_event</code> is triggered, each callback receives a <code>jw_event_data</code> structure which has at least the following read-only information:
+  <ul>
+    <li>source (<code>void *</code>): The source of the event</li>
+    <li>name (<code>const char *</code>): The name of the event</li>
+    <li>notifier (<code>jw_event</code>): The notifier on which the event triggered</li>
+    <li>data (<code>void *</code>): event data specific to this triggering</li>
+  </ul>
+</p>
+
+<h3>Eventing Lifecycle</h3>
+<ul class="align1">
+  <li class="li-plain">
+    <h4 class="inner-headings">Registering for an Event</h4>
+    <p>Types that expose events have a <code><em>type</em>_event(eventName)</code> function (e.g. <code>jw_client_event</code>) to return the associated <code>jw_event</code> instance.  The function <code>jw_event_bind</code> is called to register a callback function (optionally with a user-supplied pointer that will be used as the <code>arg</code> parameter of the callback), while the function <code>jw_event_unbind</code> is called to unregister a callback function.</p>
+    
+    <h4 class="inner-headings">Creating a New Event</h4>
+    <p>User-defined types can expose their own events by:
+    <ul>
+      <li>creating a <code>jw_event_dispatcher</code></li>
+      <li>calling <code>jw_event_dispatcher_create_event(dispatcher, eventName)</code> for each new event</li>
+      <li>defining the function <code><em>user-type</em>_event(eventName)</code> which returns the named event; <code>jw_event_dispatcher_get_event(dispatcher, eventName)</code> can be used to locate the appropriate <code>jw_event</code>.</li>
+    </ul></p>
+    
+    <h4 class="inner-headings">Triggering an Event</h4>
+    <p>The function <code>jw_event_trigger</code> is called to trigger an event, which in turn executes each callback registered to it.  If the event dispatcher was initialized with a workq object, the callbacks will be scheduled on the queue and will be called in the next iteration of the libevent event loop.  If the event dispatcher was not initialized with a workq object, the callbacks are run immediately from the current stack frame.</p>
+    <p>It is important to note that <code>jw_event_trigger</code> can fail, primarily due to out-of-memory errors.  Where triggering the event is critical, such as for <code>_CLOSED</code> or <code>_DESTROYED</code> events, users can pre-allocate the required memory at a safe time with the <code>jw_event_prepare_trigger</code> and use the <code>jw_event_trigger_prepared</code> function to actually trigger the event without danger of failure.  Prepared triggers will be cleaned up automatically when they are used.  If they are not used, they can be manually destroyed via <code>jw_event_unprepare_trigger</code>.</p>
+    <p>Callbacks are executed in a "breadth-first" order: all callbacks for a given event are executed before any other events triggered by those callbacks are executed.  This means <code>jw_event_trigger</code> may return before the callbacks have been executed (if the event dispatcher was initialized with a workq object, <code>jw_event_trigger</code> will <i>always</i> return before the callbacks have been executed); a <code>jw_event_result_callback</code> function can be passed to <code>jw_event_trigger</code> if code must be executed after all the related callbacks for a given event are complete.</p>
+  </li>
+</ul>
+
+<h3>Event Chaining</h3>
+
+<p>JWC treats the events for received stanzas ("iqReceived", "messageReceived", and "presenceReceived") as a chain of events: a "before" event (e.g. "beforeIqReceived"), the "on" event (e.g. "iqReceived"), and the "after" event (e.g. "afterIqReceived"). For these events, all of the callbacks for a given level are triggered; if any callback sets the <code>jw_event_data</code> structure's <code>handled</code> flag to true, then the subsequent events in the chain are not triggered.  For instance, if a callback for "beforeIqReceived" sets <code>handled</code> to true, then the "iqReceived" and "afterIqReceived" events are not triggered.</p>
+
+<h3>More Information</h3>
+
+<p>Detailed API documentation can be found <a href="api/html/eventing_8h.html">here</a>.</p>
+
+<hr/>
+
+<h2>Error Handling</h2>
+
+<p>There are two levels of error-handling in JWC: return values and the <code>jw_err</code> structure. Most functions that can fail return <code>bool</code>. <code>true</code> means the function succeeded while <code>false</code> means an error was encountered. The <code>jw_err</code> (if provided by the user) provides more detail on the failure, such as a type (enumerated in <code>jw_errcode</code>), and a pre-canned textual message.</p>
+
+<hr/>
+
+<h2>SASL Authentication</h2>
+
+<p>In the process of establishing a connection to an XMPP server, a jw_client instance will participate in a SASL authentication sequence.  Normally, users of jw_client need only provide a jid (JW_CLIENT_CONFIG_USERJID) and password (JW_CLIENT_CONFIG_USERPW) in the jw_htable config passed to the jw_client_connect() function and everything will "just work".  However, the process can be customized for users that require non-default authentication mechanisms.</p>
+
+<h3>SASL Factories</h3>
+
+<p>A jw_sasl_factory instance manages a set of SASL mechanisms and assists in choosing the "best" one given a specification for what the remote endpoint supports.  As far as the jw_sasl_factory instance is concerned, the "best", or "most preferred" mechanism is the one most recently registered with the factory.  The rule is: when registering mechanisms with a factory, register them in <strong>reverse</strong> order of preference.  The factory should then be added to the jw_htable config passed to the jw_client_connect function with the key JW_CLIENT_CONFIG_SASL_FACTORY.</p>
+
+<h3>SASL Mechanisms</h3>
+
+<p>Creating a SASL mechanism is as simple as mapping the stages of the mechanism sequence to a function table.  Specifically, there is an <code>init</code> function, called before SASL authentication begins; a <code>cleanup</code> function, called after it completes; a <code>start</code> function, called upon initiation of the authentication sequence; and a <code>step</code> function, called for each authentication step thereafter.  The framework provides the mechanism with storage for a single void* pointer so the mechanism can keep private state.  JWC already has implementations for default, "Manditory-To-Implement" mechanisms (PLAIN and MD5) which can be used in any custom factory sets that require them.</p>
+
+<p>The mechanisms handle only raw, base64-decoded data in their <code>start</code> and <code>step</code> functions.  Higher-level communications, such as &lt;success/&gt;and &lt;failure/&gt; elements, are handled by the framework and do not reach the mechanism implementations themselves.  The data the mechansisms produce for output does not need to be base64-encoded -- the framework will do that automatically if not explicitly told not to.  See the implementation of SASL PLAIN (src/sasl/sasl_mech_plain.c) for a complete example.</p>
+
+<hr/>
+
+<h2>Sample Applications</h2>
+
+<p>A walkthrough for creating a simple client can be seen in the <a href="gettingStartedGuide.html">Getting Started Guide</a>.</p>
+
+<hr/>
+<h5>
+&copy; 2012 Cisco Systems, Inc. All rights reserved.
+</h5>
+</body>
+</html>
