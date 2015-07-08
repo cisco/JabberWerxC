@@ -1,0 +1,294 @@
+<!--
+/**
+ * filename:        gettingStartedGuide.html
+ *
+ * Portions created or assigned to Cisco Systems, Inc. are
+ * Copyright (c) 2011 Cisco Systems, Inc.  All Rights Reserved.
+ */
+-->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>JabberWerxC Library Getting Started Guide</title>
+    <link rel="stylesheet" type="text/css" href="jabberwerx.css" />
+</head>
+<body class="border">
+
+<table width="90%">
+<tr>
+<td class="center"><h1 class="title">JabberWerxC Library Getting Started Guide</h1></td>
+</tr>
+</table>
+<div class="summary">
+<h2 align="center">
+
+C XMPP-based Presence and Instant Messaging
+
+</h2>
+</div>
+
+<h2>Introduction</h2>
+<p>This tutorial will step you through the process of creating a basic XMPP client using JabberWerxC. For simplicity most error handling is omitted.</p>
+
+<p>Some basic requirements before proceeding are:
+<ul class="align1">
+    <li class="li-plain">Basic knowledge of the C programming language.</li>
+    <li class="li-plain">Basic understanding of
+        <a href="http://www.xmpp.org" style="text-decoration:none">XMPP</a></li>
+</ul></p>
+
+<p>Examples in this document use the following header files:
+
+<pre class="codebox">
+#include &lt;jabberwerx/jabberwerx.h&gt;
+#include &lt;jabberwerx/client.h&gt;
+#include &lt;jabberwerx/crypto/tls.h&gt;
+#include &lt;jabberwerx/util/log.h&gt;
+
+#include &lt;event2/event.h&gt;
+</pre></p>
+
+<h2>Prerequisites</h2>
+<p>In order to build and run your project, the JWC library and its dependencies need to be in the appropriate paths.  To aid in deployment, the JWC package includes all necessary dependencies.  If JWC is installed in <code>/usr/local/jabberwerxc</code> (JABBERWERXC_HOME), you will usually have the following for Linux:
+
+<pre class="codebox">
+LD_LIBRARY_PATH=$JABBERWERXC_HOME/lib:$LD_LIBRARY_PATH
+</pre>
+
+and for Mac OS X:
+<pre class="codebox">
+DYLD_LIBRARY_PATH=$JABBERWERXC_HOME/lib:$DYLD_LIBRARY_PATH
+</pre></p>
+
+<p>Also, the the following compiler and linker flags are necessary:
+
+<pre class="codebox">
+CFLAGS=-I${JABBERWERXC_HOME}/include
+LDFLAGS=-L${JABBERWERXC_HOME}/lib -levent_core -levent_extra -ljabberwerx
+</pre>
+</p>
+
+<h2>The Connection Base</h2>
+<p>JabberWerxC uses libevent for underlying connectivity and eventing. libevent uses a <code>struct event_base*</code> to drive this process. Application writers must create the base and let libevent continually dispatch until terminated by jw_client when the connection is closed.</p>
+<p>Add this code to your main before using the <code>jw_client</code>:</p>
+<pre class="codebox">
+    struct event_base *base = event_base_new();
+</pre>
+
+<h2>Connecting to XMPP</h2>
+<p>JabberWerxC uses a <code>jw_client</code> to connect and authenticate with an XMPP server.
+<pre class="codebox">
+    jw_htable *config;
+    jw_workq  *workq;
+    jw_client *client;
+    jw_err    err;
+
+    jw_htable_create(0, jw_strcase_hashcode, jw_strcase_compare,
+                     &amp;config, NULL);
+    jw_htable_put(config, JW_STREAM_CONFIG_SELECTOR, base, NULL, NULL);
+
+    jw_workq_create(config, &amp;workq);
+
+    jw_client_create(workq, &amp;client, &amp;err);
+</pre></p>
+<p>A connection attempt is made using the <code>jw_client_connect</code> function. Connection configuration is passed to the function using a jw_htable. The same config htable can be used for all related objects, such as the previously-created workq. For simplicity in the code below, the origins of the strings stored in the hashtable are not explained here.</p>
+<pre class="codebox">
+    // user jid
+    jw_htable_put(config, JW_CLIENT_CONFIG_USERJID, jid_str, NULL, NULL);
+
+    // password
+    jw_htable_put(config, JW_CLIENT_CONFIG_USERPW, password_str, NULL, NULL);
+
+    // attempt to connect
+    if (!jw_client_connect(client, config, &amp;err))
+    {
+        jw_err_log(JW_LOG_ERROR, &amp;err, "could not connect");
+    }
+</pre>
+
+<p>Since <code>jw_client</code> is completely asynchronous, nothing beyond validation has been done.  Libevent needs to be told to continue to process network events, usually by calling <code>event_base_dispatch</code>. Add the following code after <code>jw_client_connect</code>:
+<pre class="codebox">
+    // this will return once the client disconnects
+    event_base_dispatch(base);
+    
+    // release resources
+    jw_workq_destroy(workq);
+    event_base_free(base);
+</pre>
+
+<p>TLS and BOSH over https require an acceptance callback configuration option. This callback gives users a chance to allow a connection that would fail because of an invalid certificate.</p>
+<pre class="codebox">
+static void clientTLSAcceptCertCB(jw_tls_session *sess)
+{
+    // always proceed with a connection by calling jw_tls_proceed
+    jw_tls_proceed(sess, true);
+}
+</pre>
+And in main, as part of the configuration but before the connection attempt, add the following:
+<pre class="codebox">
+    jw_tls_accept_cb_htable_value *acbv;
+
+    acbv = jw_data_malloc(sizeof(jw_tls_accept_cb_htable_value));
+    acbv-&gt;cb = clientTLSAcceptCertCB;
+    jw_htable_put(config, JW_TLS_CONFIG_ACCEPT_CB, acbv,
+                  jw_htable_free_data_cleaner, NULL);
+</pre>
+
+<h2>Connection events</h2>
+<p><code>jw_client_connect</code> connects asynchronously. <code>jw_client</code> defines connection events where the user should perform post connection work. This is true of the entire library: most operations are asynchronous and users should always implement consequent actions in event handlers.</p>
+<pre class="codebox">
+static void clientConnectedCallback(jw_event_data event, void *arg)
+{
+    jw_log(JW_LOG_INFO, "client connected");
+}
+
+static void clientDisconnectedCallback(jw_event_data event, void *arg)
+{
+    jw_log(JW_LOG_INFO, "client disconnected");
+
+    jw_dom_node *errDom = event-&gt;data;
+    if (errDom)
+    {
+        // examine errDom for error information
+    }
+}
+</pre>
+In order to connect the previous functions to their events, make the following calls in your main before calling <code>jw_client_connect</code>:
+<pre class="codebox">
+    jw_event_bind(jw_client_event(client, JW_CLIENT_EVENT_CONNECTED),
+                  clientConnectedCallback, NULL);
+    jw_event_bind(jw_client_event(client, JW_CLIENT_EVENT_DISCONNECTED),
+                  clientDisconnectedCallback, NULL);
+</pre>
+<p>
+<code>clientConnectedCallback</code> is triggered when the connection completes successfully and <code>clientDisconnectedCallback</code> when the client disconnects. Note that the JW_CLIENT_EVENT_DISCONNECTED event is fired when a connection attempt ends in error, but only if the call to <code>jw_client_connect</code> originally returned <code>true</code>.</p>
+
+
+<h2>More jw_client Events</h2>
+A full list of events JabberWerxC supports can be found at
+<a href="events.rst" style="text-decoration:none">Events</a>. Here is an example of using some of the more common events.
+
+<pre class="codebox">
+static void clientPresenceReceivedCB(jw_event_data event, void *arg)
+{
+    jw_log(JW_LOG_INFO, "presence received");
+
+    jw_dom_node *node = event-&gt;data;
+    if (node)
+    {
+        // examine node for presence information
+    }
+}
+
+static void clientMessageReceivedCB(jw_event_data event, void *arg)
+{
+    jw_log(JW_LOG_INFO, "message received");
+
+    jw_dom_node *node = event-&gt;data;
+    if (node)
+    {
+        // examine node for message information
+    }
+}
+</pre>
+And once again, these events must be bound before the connection attempt:
+<pre class="codebox">
+    jw_event_bind(jw_client_event(client, JW_CLIENT_EVENT_PRESENCE_RECEIVED),
+                  clientPresenceReceivedCB, NULL);
+    jw_event_bind(jw_client_event(client, JW_CLIENT_EVENT_MESSAGE_RECEIVED),
+                  clientMessageReceivedCB, NULL);
+</pre>
+
+<h2>Sending XMPP Stanzas</h2>
+<p><code>jw_client</code> exposes a function to send an XMPP stanza.</p>
+<pre class="codebox">
+    JABBERWERX_API bool jw_client_send_stanza(jw_client *client,
+                                              jw_dom_node *stanza,
+                                              jw_err *err);
+</pre>
+Here is a JW_CLIENT_EVENT_MESSAGE_RECEIVED handler that echoes chat messages back to the sender.
+<pre class="codebox">
+static void clientMessageReceivedCB(jw_event_data event, void *arg)
+{
+    jw_dom_node *node = event-&gt;data;
+    jw_client *client = arg;
+
+    const char *type = jw_dom_get_attribute(node, "type");
+    if (0 == jw_strcmp(type, "chat"))
+    {
+        jw_dom_ctx *dom_ctx;
+        jw_dom_node *dup;
+
+        jw_dom_context_create(&amp;dom_ctx, NULL);
+        jw_dom_import(dom_ctx, node, true, &amp;dup, NULL);
+
+        const char *to = jw_dom_get_attribute(dup, "{}to");
+        const char *from = jw_dom_get_attribute(dup, "{}from");
+
+        jw_dom_set_attribute(dup, "{}from", to, NULL);
+        jw_dom_set_attribute(dup, "{}to", from, NULL);
+
+        jw_client_send_stanza(client, dup, NULL);
+    }
+}
+</pre>
+
+<h2>Cleanup</h2>
+<p>To clean up, you can call <code>jw_client_destroy</code> in your JW_CLIENT_EVENT_DISCONNECTED event (or any time after the disconnected event is fired):
+<pre class="codebox">
+static void clientDisconnectedCallback(jw_event_data event, void *arg)
+{
+    jw_log(JW_LOG_INFO, "client disconnected");
+
+    jw_dom_node *errDom = event-&gt;data;
+    if (errDom)
+    {
+        // examine errDom for error information
+    }
+    
+    jw_client_destroy(event-&gt;source);
+}
+</pre></p>
+
+<p>Cleaning up the configuration and other client-related data is done asynchronously in (or after) a JW_CLIENT_EVENT_DESTROYED event:
+<pre class="codebox">
+static void clientDestroyedCallback(jw_event_data event, void *arg)
+{
+    // be sure to register config as the arg when binding the event
+    jw_htable *config = arg;
+    
+    jw_htable_destroy(config);
+    
+    // additional cleanup
+}
+</pre>
+
+<p>The only structures that cannot be destroyed in this callback are the ones that may be in use at the time the callback is running, such as the libevent event_base* and the workq.  Instead, these should be destroyed after <code>event_base_dispatch</code> returns.</p>
+
+Then bind the event by adding the following after your other callback bindings:
+<pre class="codebox">
+    jw_event_bind(jw_client_event(client, JW_CLIENT_EVENT_DESTROYED),
+                  clientDestroyedCallback,
+                  config);
+</pre></p>
+
+<p>To cleanup the values added to the configuration table, specify a cleaner function when calling <code>jw_htable_put</code>. If the key is static and the value is created with one of the JabberWerxC memory allocation functions (e.g. jw_data_malloc, jw_strdup, etc), the convenience function <code>jw_htable_free_data_cleaner</code> can be used. Assuming jid_str and password_str are allocated using <code>jw_strdup</code>, replace the configuration setup for USERJID and USERPW calls with the following:
+<pre class="codebox">
+    // user jid
+    jw_htable_put(config, JW_CLIENT_CONFIG_USERJID, jid_str,
+                  jw_htable_free_data_cleaner, NULL);
+    // password
+    jw_htable_put(config, JW_CLIENT_CONFIG_USERPW, password_str,
+                  jw_htable_free_data_cleaner, NULL);
+</pre>
+
+<h2>Conclusion</h2>
+Using the examples above you should now be able to create a client, connect to an XMPP server, display and respond to presence and messages. See the simpleclient implementation at <a href="index.html" style="text-decoration:none">simpleclient</a> for a more sophisticated example of a JabberWerxC client.
+
+<hr/>
+<h5>
+&copy; 2012 Cisco Systems, Inc. All rights reserved.
+</h5>
+</body>
+</html>

@@ -1,0 +1,187 @@
+/**
+ * Copyrights
+ *
+ * Portions created or assigned to Cisco Systems, Inc. are
+ * Copyright (c) 2010-2015 Cisco Systems, Inc.  All Rights Reserved.
+ * See LICENSE for details.
+ */
+
+#include "jabberwerx/util/base64.h"
+#include "jabberwerx/util/mem.h"
+
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+
+static const char* G_HEX_ENCODE_TAB = "0123456789abcdef";
+
+static const uint8_t G_HEX_DECODE_TAB[] = {
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+};
+
+JABBERWERX_API bool jw_hex_encode(const uint8_t *orig,
+                                  size_t         orig_len,
+                                  char         **result,
+                                  size_t        *result_len,
+                                  jw_err        *err)
+{
+    const uint8_t *lim;
+    char       *res;
+    char       *base;
+    size_t      rlen;
+    uint8_t     d;
+
+    assert(orig != NULL);
+    assert(result != NULL);
+    assert(result_len != NULL);
+
+    /*return empty string on 0 length input */
+    if (!orig_len)
+    {
+        res = (char *)jw_data_malloc(1);
+        if (!res)
+        {
+            JABBERWERX_ERROR(err, JW_ERR_NO_MEMORY);
+            return false;
+        }
+        *result = res;
+        **result = 0;
+        *result_len = 0;
+        return true;
+    }
+
+    rlen = orig_len << 1;
+    base = res = (char *)jw_data_malloc(rlen+1);
+    if (!res)
+    {
+        JABBERWERX_ERROR(err, JW_ERR_NO_MEMORY);
+        return false;
+    }
+
+    lim = orig + orig_len;
+    for ( ; orig < lim; orig++)
+    {
+        d = *orig;
+        *res++ = G_HEX_ENCODE_TAB[(d >> 4) & 0x0f];
+        *res++ = G_HEX_ENCODE_TAB[ d       & 0x0f];
+    }
+    *res++ = '\0';
+
+    *result = base;
+    *result_len = rlen;
+    return true;
+}
+
+JABBERWERX_API bool jw_hex_decode(const char *orig,
+                                  ssize_t     orig_len,
+                                  uint8_t   **result,
+                                  size_t     *result_len,
+                                  jw_err     *err)
+{
+    size_t rlen;
+    uint8_t *res, *base;
+    bool shift;
+    const char *lim;
+
+    assert(orig != NULL);
+    assert(result != NULL);
+    assert(result_len != NULL);
+
+    if (orig_len < -1)
+    {
+        JABBERWERX_ERROR(err, JW_ERR_INVALID_ARG);
+        return false;
+    }
+    if (orig_len == -1)
+    {
+        orig_len = strlen(orig);
+    }
+    /*return empty string on 0 length input */
+    if (!orig_len)
+    {
+        res = (uint8_t *)jw_data_malloc(1);
+        if (!res)
+        {
+            JABBERWERX_ERROR(err, JW_ERR_NO_MEMORY);
+            return false;
+        }
+        *result = res;
+        **result = 0;
+        *result_len = 0;
+        return true;
+    }
+
+    // The input must be a multiple of 2
+    if ( (orig_len & 0x01) != 0 )
+    {
+        JABBERWERX_ERROR(err, JW_ERR_INVALID_ARG);
+        return false;
+    }
+
+    rlen = orig_len >> 1;
+    base = res = (uint8_t *)jw_data_malloc(rlen);
+    if (!res)
+    {
+        JABBERWERX_ERROR(err, JW_ERR_NO_MEMORY);
+        return false;
+    }
+
+    lim = orig + orig_len;
+    shift = true;
+    for ( ; orig < lim; ++orig)
+    {
+        int val = G_HEX_DECODE_TAB[(int)(*orig)];
+        if (val == 0xff)
+        {
+            JABBERWERX_ERROR(err, JW_ERR_INVALID_ARG);
+            jw_data_free(base);
+            return false;
+        }
+
+        if (shift)
+        {
+            *res = (uint8_t)(val << 4);
+            shift = false;
+        }
+        else
+        {
+            *res++ |= val;
+            shift = true;
+        }
+    }
+
+    *result = base;
+    *result_len = rlen;
+    return true;
+}

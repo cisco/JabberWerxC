@@ -1,0 +1,101 @@
+{
+     fctx-printf-leak-at-exit
+     Memcheck:Leak
+     fun:malloc
+     ...
+     fun:printf
+     fun:main
+}
+{
+     fctx-log_test_start-leak-at-exit
+     Memcheck:Leak
+     fun:malloc
+     ...
+     fun:fct_dotted_line_start
+     fun:fctkern__log_test_start
+}
+{
+     fctx-fct_chk-leak-at-exit
+     Memcheck:Leak
+     ...
+     fun:fctchk_new
+}
+{
+     jw_log-localtime_r-leak-at-exit
+     Memcheck:Leak
+     ...
+     fun:localtime_r
+     ...
+     fun:jw_log
+}
+{
+     mem-test-backtrace-leak-at-exit
+     Memcheck:Leak
+     ...
+     fun:pthread_once
+     fun:mallocFn
+     ...
+     fun:evbuffer_new
+     fun:mem_test
+}
+{
+     evutil_getaddrinfo-reachable-at-exit
+     Memcheck:Leak
+     ...
+     fun:evutil_getaddrinfo
+     ...
+     fun:stream_test
+}
+
+# OS X 10.8 isn't fully supported and has several false positives
+{
+   osx_loader_false_positive_1
+   Memcheck:Leak
+   ...
+   fun:_ZN11ImageLoader23recursiveInitializationERKNS_11LinkContextEjRNS_21InitializerTimingListE
+   ...
+}
+{
+   osx_loader_false_positive_2
+   Memcheck:Leak
+   ...
+   fun:_ZN16ImageLoaderMachO16doInitializationERKN11ImageLoader11LinkContextE
+   ...
+}
+{
+   osx_loader_false_positive_3
+   Memcheck:Leak
+   ...
+   fun:map_images_nolock
+   ...
+}
+{
+   osx_loader_false_positive_4
+   Memcheck:Leak
+   ...
+   fun:_objc_fetch_pthread_data
+   fun:_ZL27_fetchInitializingClassLista
+   fun:_class_initialize
+   fun:_class_initialize
+   fun:_class_initialize
+   fun:_class_initialize
+   fun:prepareForMethodLookup
+   fun:lookUpMethod
+   fun:objc_msgSend
+   fun:_libxpc_initializer
+   fun:libSystem_initializer
+}
+{
+   osx_fctx_false_positive_1
+   Memcheck:Leak
+   ...
+   fun:fct_standard_logger__on_test_start
+   ...
+}
+{
+   osx_fctx_false_positive_2
+   Memcheck:Leak
+   ...
+   fun:fct_standard_logger__on_fctx_end
+   ...
+}
