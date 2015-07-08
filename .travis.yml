@@ -11,5 +11,9 @@ before_install:
   - wget http://www.cmake.org/files/v3.2/cmake-3.2.3-Linux-x86_64.tar.gz  -O /tmp/cmake.tar.gz
   - tar xzf /tmp/cmake.tar.gz
   - export PATH=$PWD/cmake-3.2.3-Linux-x86_64/bin/:$PATH
+  - sudo pip install cpp-coveralls
 script:
-- ./build.sh all test
+  - ./coveragereport.sh
+after_success:
+  - coveralls --gcov-options '\-lp'
+secure: "e76K0QIntcIyTnnA7GvhN+BIKw3uZUpxs8qBUCfxjZfDq6miN4fGoDTGi0iYwQFIuHP/28czyS9oNrn+VzNduHjxHSoF2G6AWGs226eMJSoG47s34XmsYU5BQAeobvT0OeIuwCStNeFGFsAY3FvWnGbNELV7HmCJ+WMy4z/61OwnHkF+nfiZofxV3QorD4Z3zQId62SgX4Y5QY/rU+aQZHoB030qW2wwgFkx+O3UkZzW0vphYWv0Mz2uN4Ir2ZZ20Th2SZNqq2sIinFTZUFD0AX+BsvzvDeS2ptnf4Md93SyWs7JV1RPmXUas8ReUO/Wt0W1E7S3G0Cg9yAKQT/ALQ0NA5cjYa9GxrM0NKI6DOqRszGEPqhxPo+ZNmDsDcBTX84tK5LxuVy3hyDxvs+J31+rOw9WtXais21b/JMnlqAZ/ePfQQwW7LHIMOg1323KGAQEHwuMZl78JzePJkyKyGe5RMIpJ7ZiaKoIZInTH4Ed/a6gja34Mo8uKxu+eQtjP/MadBFFO5I1ZlIoUCLouzt3APIY25vGgKaN5QMpz3yMpsaUeGRJYJCn7FO9JfO/+wY7+ZeQtKEMBw3eQKhHKgdKfKRDmMNRUOcUZZLE50NdLUw/Tk5clfNUYpdjAE4clljJPYTwdw5FAg15Sf3qjViSbH8GRKzLURMLnW8rht0="
