@@ -11,6 +11,14 @@ addons:
     packages:
       - cmake
       - cmake-data
+      - pkg-config
+      - lcov
+      - libexpat-dev
+      - libc-ares-dev
+      - libevent-dev
+      - libcurl4-openssl-dev
+      - libidn11-dev
+      - openssl
 before_install:
   - sudo pip install cpp-coveralls
 script:
