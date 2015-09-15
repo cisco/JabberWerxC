@@ -13,6 +13,7 @@ addons:
       - cmake
       - cmake-data
       - pkg-config
+      - lcov
       - libc-ares-dev
       - libevent-dev
       - libcurl4-openssl-dev
