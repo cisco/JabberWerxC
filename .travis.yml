@@ -2,6 +2,7 @@ language: c
 cache: ccache
 compiler:
   - clang
+sudo: false
 env:
   PKG_CONFIG_PATH: $TRAVIS_BUILD_DIR/build-tools/pkgconfig
 addons:
@@ -20,7 +21,8 @@ addons:
       - libidn11-dev
       - openssl
 before_install:
-  - sudo pip install cpp-coveralls
+  - export PATH=$HOME/.local/bin:$PATH
+  - pip install cpp-coveralls --user `whoami`
 script:
   - ./coveragereport.sh
 after_success:
